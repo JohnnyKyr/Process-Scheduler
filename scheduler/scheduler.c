@@ -8,11 +8,90 @@
 struct queue{
 	int data;
 	struct queue *next;
-}
-struct queue Q;
+	struct queue *prev;
+};
 
-void insert()
-void pop()
+struct process{
+	char * name;
+	int data;
+};
+
+
+void insert(struct queue *head,int data){
+	struct queue* Q = (struct queue*)malloc(sizeof(struct queue));
+
+	Q->data = data;
+
+	Q->next = &head;
+
+	Q->prev = NULL;
+
+	if(head !=NULL)
+	head->prev = Q;
+
+}
+
+int numOfProcess(FILE *fp){
+	
+	int count =0;
+	char c;
+	
+	if (fp==NULL) fprintf(stderr,"ERROR");
+	fseek(fp,0,SEEK_SET);
+    c = getc(fp);
+	while(c!=EOF){
+		if (c == '\n') count++;
+	
+		c = getc(fp);
+	}
+	return count;
+}
+void getProcess(FILE *fp,int n,struct process *PROCCS){
+   if(fp==NULL) fprintf(stderr,"ERROR");
+    int k=0;
+    int *numOfChars;
+   
+    int n1=0;
+
+    char c;
+    int j=0;
+    char *buf;
+    
+    fseek(fp,0,SEEK_SET);
+
+
+    numOfChars=(int*)malloc(n*sizeof(int));// A dynamic array that counts the chars before '}'
+    numOfChars[k]=0;
+
+    c = getc(fp);
+    
+    while(c!=EOF){
+
+        if(c != '\n')  numOfChars[k]++; // It counts the chars before '}'/
+            else if(c=='\n') k++;   //The "i" takes numOfChars in the next element of the array
+
+        c = getc(fp);//Restarts the pointer fp1
+    }
+    
+    int i=0;
+  
+    fseek(fp,0,SEEK_SET);
+    int n2=0;
+
+    while(i<n){
+		
+        buf=malloc(numOfChars[i]*sizeof(char)+2);
+        fscanf(fp,"%s %d",buf,&n1);//Read the file until \n    
+		
+		PROCCS[i].data = n1;
+		PROCCS[i].name = buf;
+
+		i++;
+	}
+
+ 
+}
+void pop(){}
 /* global variables and data structures */
 
 /* signal handler(s) */
@@ -21,11 +100,18 @@ void pop()
 
 int main(int argc,char **argv)
 {
-	printf("Argc:%d\n",argc);
-	for(int i=0; i<argc;i++)
-	printf("ARGV:%s \n",argv[i]);
+	struct process *PROCCS =NULL;
+	FILE *fp;
+	char * FILENAME;
+	int n;
 
-	printf("Scheduler exits\n");
-	printf("\n");
+	FILENAME = argv[argc-1];
+	fp = fopen(FILENAME,"r");
+	n=numOfProcess(fp);
+	PROCCS=(struct process*)malloc(n*sizeof(struct process));
+	
+	getProcess(fp,n,PROCCS);
+	
+
 	return 0;
 }
