@@ -6,7 +6,7 @@
 
 /* definition and implementation of process descriptor and queue(s) */
 struct queue{
-	int data;
+	struct process *p;
 	struct queue *next;
 	struct queue *prev;
 };
@@ -17,18 +17,35 @@ struct process{
 };
 
 
-void insert(struct queue *head,int data){
+void push(struct queue **head,struct process PROCC){
 	struct queue* Q = (struct queue*)malloc(sizeof(struct queue));
-
-	Q->data = data;
-
-	Q->next = &head;
-
+	//head->1->2->end 
+	Q->p = &PROCC;
+	printf("%s",Q->p->name);
+	Q->next = (*head);
 	Q->prev = NULL;
 
-	if(head !=NULL)
-	head->prev = Q;
 
+	if ((*head) != NULL)
+		(*head)->prev = Q;
+
+	(*head) = Q;
+}
+
+void pop(struct queue *head){
+	head->next = head;
+}
+
+void printList(struct queue* node){
+	struct queue* last;
+	printf("\nTraversal in forward direction \n");
+	while (node != NULL) {
+		printf("%s\n", node->p->name);
+		last = node;
+		node = node->next;
+	}
+	
+	
 }
 
 int numOfProcess(FILE *fp){
@@ -54,7 +71,7 @@ void getProcess(FILE *fp,int n,struct process *PROCCS){
     int n1=0;
 
     char c;
-    int j=0;
+   
     char *buf;
     
     fseek(fp,0,SEEK_SET);
@@ -76,7 +93,7 @@ void getProcess(FILE *fp,int n,struct process *PROCCS){
     int i=0;
   
     fseek(fp,0,SEEK_SET);
-    int n2=0;
+   
 
     while(i<n){
 		
@@ -91,7 +108,7 @@ void getProcess(FILE *fp,int n,struct process *PROCCS){
 
  
 }
-void pop(){}
+
 /* global variables and data structures */
 
 /* signal handler(s) */
@@ -100,7 +117,8 @@ void pop(){}
 
 int main(int argc,char **argv)
 {
-	struct process *PROCCS =NULL;
+	struct process* PROCCS =NULL;
+	struct queue *Q =NULL;
 	FILE *fp;
 	char * FILENAME;
 	int n;
@@ -110,8 +128,15 @@ int main(int argc,char **argv)
 	n=numOfProcess(fp);
 	PROCCS=(struct process*)malloc(n*sizeof(struct process));
 	
+	
+	
 	getProcess(fp,n,PROCCS);
 	
-
+	
+	
+	for(int i=0;i<=n;i++) push(&Q,PROCCS[i]);
+	
+	printf("%s \n",Q->p->name);
+	//printList(Q);
 	return 0;
 }
