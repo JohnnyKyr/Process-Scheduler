@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 /* header files */
 
 /* global definitions */
@@ -17,11 +18,11 @@ struct process{
 };
 
 
-void push(struct queue **head,struct process PROCC){
+void push(struct queue **head,struct process *PROCC){
 	struct queue* Q = (struct queue*)malloc(sizeof(struct queue));
 	//head->1->2->end 
-	Q->p = &PROCC;
-	printf("%s",Q->p->name);
+	Q->p = PROCC;
+	//printf("%s",Q->p->name);
 	Q->next = (*head);
 	Q->prev = NULL;
 
@@ -32,16 +33,19 @@ void push(struct queue **head,struct process PROCC){
 	(*head) = Q;
 }
 
-void pop(struct queue *head){
-	head->next = head;
+
+void pop(struct queue **head){
+	if(*head ==NULL) return;
+	
+	else {printf("POPED: %s \n",(*head)->p->name);*head = (*head)->next;} 
 }
 
 void printList(struct queue* node){
-	struct queue* last;
+	
 	printf("\nTraversal in forward direction \n");
 	while (node != NULL) {
 		printf("%s\n", node->p->name);
-		last = node;
+		
 		node = node->next;
 	}
 	
@@ -63,6 +67,7 @@ int numOfProcess(FILE *fp){
 	}
 	return count;
 }
+
 void getProcess(FILE *fp,int n,struct process *PROCCS){
    if(fp==NULL) fprintf(stderr,"ERROR");
     int k=0;
@@ -109,6 +114,17 @@ void getProcess(FILE *fp,int n,struct process *PROCCS){
  
 }
 
+
+void FCFS(struct queue **q){
+	int pid;
+	while(q!=NULL){
+		pid = fork();
+		if (pid ==0){
+			execl("../","ls -l");
+		}
+	}
+
+}
 /* global variables and data structures */
 
 /* signal handler(s) */
@@ -128,15 +144,12 @@ int main(int argc,char **argv)
 	n=numOfProcess(fp);
 	PROCCS=(struct process*)malloc(n*sizeof(struct process));
 	
-	
-	
 	getProcess(fp,n,PROCCS);
 	
-	
-	
-	for(int i=0;i<=n;i++) push(&Q,PROCCS[i]);
-	
-	printf("%s \n",Q->p->name);
-	//printList(Q);
-	return 0;
+	for(int i=n-1;i>=0;i--) push(&Q,&PROCCS[i]);
+
+	FCFS(Q);
+	//printf("%s \n",Q->next->next->p->name);
+
+
 }
