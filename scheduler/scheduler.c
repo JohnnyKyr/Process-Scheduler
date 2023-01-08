@@ -115,13 +115,17 @@ void getProcess(FILE *fp,int n,struct process *PROCCS){
 }
 
 
-void FCFS(struct queue **q){
+void FCFS(struct queue *q,int n){
 	int pid;
-	while(q!=NULL){
+	
+	for(int i=0;i<n;i++){
 		pid = fork();
 		if (pid ==0){
-			execl("../","ls -l");
-		}
+			execl(q->p->name,NULL);
+			
+			while(1) sleep(1);
+		}else{
+		q=q ->next;}
 	}
 
 }
@@ -148,7 +152,7 @@ int main(int argc,char **argv)
 	
 	for(int i=n-1;i>=0;i--) push(&Q,&PROCCS[i]);
 
-	FCFS(Q);
+	FCFS(Q,n);
 	//printf("%s \n",Q->next->next->p->name);
 
 
