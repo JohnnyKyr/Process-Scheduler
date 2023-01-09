@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <wait.h>
 /* header files */
 
 /* global definitions */
-
+//add shared memory for time
 static volatile int finishedProcFlag = 0;
 /* definition and implementation of process descriptor and queue(s) */
 struct queue{
@@ -54,7 +56,7 @@ void ordered_push(struct queue **head,struct process *PROCC){
 void pop(struct queue **head){
 	if(*head ==NULL) return;
 	
-	else {printf("POPED: %s \n",(*head)->p->name);*head = (*head)->next;} 
+	else {*head = (*head)->next;} 
 }
 
 void printList(struct queue* node){
@@ -135,8 +137,6 @@ void handler(int signo){
 	finishedProcFlag =1;
 	int pid, status;
 
-	printf("hello from handler (%d)\n", signo);
-
 	while ((pid = waitpid(-1, &status, WNOHANG)) > 0);
 }
 double get_wtime(void)
@@ -145,35 +145,49 @@ double get_wtime(void)
   gettimeofday(&t, NULL);
   return (double)t.tv_sec + (double)t.tv_usec*1.0e-6;
 }
-void FCFS(struct queue *q,int n){
+
+struct time {
+	double _1;
+	double _2;
+};
+
+
+
+void FCFS(struct queue *q){
 	int pid;
-	double t,t_end;
-	signal(SIGCHLD, handler);
 	
+	key_t key;
+	
+	struct time *time;
+
+	key = ftok("../scheduler", 65);
+
+	int shmid = shmget(key,sizeof(struct time),0666|IPC_CREAT);
+	signal(SIGCHLD, handler);
+	time = shmat(shmid,NULL,0);
 
 	while(q!=NULL){
 		pid = fork();
 		
 		if (pid>0){
 			while(finishedProcFlag==0){
-				sleep(1);
+				sleep(0.5);
 			}
-			printf("%s\n",q->p->name);
-			printf("Time passed %d\n",t-t_end);
-
+			time->_2= get_wtime();
+			printf("=====================================\n");
+			printf("For process: %d\n",pid);
+			printf("\t Executes:%s\n",q->p->name);
+			printf("\t Has Execution Time:%d\n",q->p->data);
+			printf("\t Elapsed Time:%f\n",time->_2-time->_1);
+			printf("=====================================\n");
 			finishedProcFlag=0;
-
 			pop(&q);
 		}else if (pid ==0){
-    		t = get_wtime();
+    		time->_1 = get_wtime();
 			execl(q->p->name,NULL);
-			t_end = get_wtime();
 			exit(1);
 		}
-		
 	}
-	
-
 }
 
 
@@ -198,6 +212,7 @@ void FCFS(struct queue *q,int n){
 
 int main(int argc,char **argv)
 {
+	double time_1, time_2;
 	struct process* PROCCS =NULL;
 	struct queue *Q =NULL;
 	FILE *fp;
@@ -213,8 +228,11 @@ int main(int argc,char **argv)
 	
 	for(int i=n-1;i>=0;i--) push(&Q,&PROCCS[i]);
 
-	
-	FCFS(Q,n);
+	time_1 = get_wtime();
+	FCFS(Q);
+	time_2 = get_wtime();
+
+	printf("\n For File = %s needed Time:%d\n",FILENAME,time_2-time_1);
 	//printf("%s \n",Q->next->next->p->name);
 
 
