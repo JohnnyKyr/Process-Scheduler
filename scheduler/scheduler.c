@@ -5,6 +5,7 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <wait.h>
+#include <string.h>
 /* header files */
 
 /* global definitions */
@@ -50,7 +51,7 @@ void push(struct queue **head,struct process *PROCC){
 
 	if ((*head) != NULL)
 		(*head)->prev = Q;
-
+	
 	(*head) = Q;
 }
 
@@ -70,7 +71,7 @@ MinHeap* init_minheap(int capacity) {
 
 MinHeap* insert_minheap(MinHeap* heap, struct process element) {
     if (heap->size == heap->capacity) {
-        fprintf(stderr, "Cannot insert %d. Heap is already full!\n", element);
+        fprintf(stderr, "Cannot insert %s. Heap is already full!\n", element.name);
       return heap;
     }
     heap->size++;
@@ -84,6 +85,7 @@ MinHeap* insert_minheap(MinHeap* heap, struct process element) {
     }
     return heap; 
 }
+MinHeap* heapify(MinHeap* heap, int index) ;
 MinHeap* delete_minimum(MinHeap* heap) {
     // Deletes the minimum element, at the root
     if (!heap || heap->size == 0)
@@ -92,6 +94,7 @@ MinHeap* delete_minimum(MinHeap* heap) {
     int size = heap->size;
     struct process last_element = heap->p[size-1];
     
+	
     // Update root value with the last element
     heap->p[0] = last_element;
 
@@ -139,14 +142,14 @@ void print_heap(MinHeap* heap) {
 void pop(struct queue **head){
 	if(*head ==NULL) return;
 	
-	else {*head = (*head)->next;} 
+	else {*head = (*head)->prev;} 
 }
 
 void printList(struct queue* node){
 	
 	printf("\nTraversal in forward direction \n");
 	while (node != NULL) {
-		printf("%s\n", node->p->name);
+		printf("%s %d\n", node->p->name,node->p->data);
 		
 		node = node->next;
 	}
@@ -231,7 +234,7 @@ double get_wtime(void)
 
 
 
-void FCFS(struct queue *q){
+void _static(struct queue *q){
 	int pid;
 	
 	key_t key;
@@ -268,7 +271,6 @@ void FCFS(struct queue *q){
 	}
 }
 
-void SJF(struct queue *q){}
 //pid = fork();
 //	if (pid == 0) { /* child */
 //		child();
@@ -287,6 +289,12 @@ void SJF(struct queue *q){}
 /* signal handler(s) */
 
 /* implementation of the scheduling policies, etc. batch(), rr() etc. */
+struct queue * gotoHead(struct queue* q,int n ){
+	for(int i=0;i<n-1;i++){
+		q = q->next;
+	}
+	return q;
+}
 
 int main(int argc,char **argv)
 {
@@ -297,23 +305,44 @@ int main(int argc,char **argv)
 	
 	char * FILENAME;
 	int n;
-
 	FILENAME = argv[argc-1];
 	fp = fopen(FILENAME,"r");
 	n=numOfProcess(fp);
 	PROCCS=(struct process*)malloc(n*sizeof(struct process));
-	MinHeap* heap = init_minheap(n);
 	getProcess(fp,n,PROCCS);
+
+
+	if(strcmp(argv[1],"BATCH")==0){
+		
+		
+		for(int i=0;i<n;i++) push(&Q,&PROCCS[i]);
+		
+		Q = gotoHead(Q,n);
+		time_1 = get_wtime();
+		_static(Q);
+		time_2 = get_wtime();
+		printf("\n For File = %s and Method =%s needed Time:%f\n",FILENAME,argv[1],time_2-time_1);
+		
+	}
+	else if(strcmp(argv[1],"SJF")==0){
+		MinHeap* heap = init_minheap(n);
+		for(int i=0;i<n;i++) insert_minheap(heap,PROCCS[i]);
 	
-	for(int i=n-1;i>=0;i--) insert_minheap(heap,PROCCS[i]);
-	print_heap(heap);
+		for(int i=0;i<n;i++){
+		struct process *temp = malloc(sizeof(struct process));
+		(*temp) = heap->p[0];
+		push(&Q,temp);
+		heap = delete_minimum(heap);
+		
+	}
+		
+		Q = gotoHead(Q,n);
+		time_1 = get_wtime();
+		_static(Q);
+		time_2 = get_wtime();
+		printf("\n For File = %s and Method =%s needed Time:%f\n",FILENAME,argv[1],time_2-time_1);
 
-	//time_1 = get_wtime();
-	//FCFS(Q);
-	//time_2 = get_wtime();
-
-	//printf("\n For File = %s needed Time:%f\n",FILENAME,time_2-time_1);
-	//printf("%s \n",Q->next->next->p->name);
-
-
+	}
+	
 }
+
