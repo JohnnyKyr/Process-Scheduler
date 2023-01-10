@@ -10,7 +10,16 @@
 /* global definitions */
 //add shared memory for time
 static volatile int finishedProcFlag = 0;
+
 /* definition and implementation of process descriptor and queue(s) */
+
+typedef struct MinHeap MinHeap;
+struct MinHeap {
+    struct process *p;
+    int size;
+    int capacity;
+};
+
 struct queue{
 	struct process *p;
 	struct queue *next;
@@ -30,6 +39,7 @@ struct time {
 
 
 void push(struct queue **head,struct process *PROCC){
+	
 	struct queue* Q = (struct queue*)malloc(sizeof(struct queue));
 	//head->1->2->end 
 	Q->p = PROCC;
@@ -45,23 +55,85 @@ void push(struct queue **head,struct process *PROCC){
 }
 
 
-	//printf("%s",Q->p->name);
-	
+int parent(int i) {return (i - 1) / 2;}
+int left_child(int i){return (2*i + 1);}
+int right_child(int i) {return (2*i + 2);}
+struct process get_min(MinHeap* heap) {return heap->p[0];}
 
+MinHeap* init_minheap(int capacity) {
+    MinHeap* minheap = (MinHeap*) malloc (1 *sizeof(MinHeap));
+    minheap->p = (struct process*) malloc (capacity*sizeof(struct process));
+    minheap->capacity = capacity;
+    minheap->size = 0;
+    return minheap;
+}
 
-void ordered_push(struct queue **head,struct process *PROCC){
-	struct queue* Q = (struct queue*)malloc(sizeof(struct queue));
-	//head->1->2->end 
-	Q->p = PROCC;
-	//printf("%s",Q->p->name);
-	Q->next = (*head);
-	Q->prev = NULL;
+MinHeap* insert_minheap(MinHeap* heap, struct process element) {
+    if (heap->size == heap->capacity) {
+        fprintf(stderr, "Cannot insert %d. Heap is already full!\n", element);
+      return heap;
+    }
+    heap->size++;
+    heap->p[heap->size - 1] = element;
+    int curr = heap->size - 1;
+    while (curr > 0 && heap->p[parent(curr)].data > heap->p[curr].data) {
+        struct process temp = heap->p[parent(curr)];
+        heap->p[parent(curr)] = heap->p[curr];
+        heap->p[curr] = temp;
+        curr = parent(curr);
+    }
+    return heap; 
+}
+MinHeap* delete_minimum(MinHeap* heap) {
+    // Deletes the minimum element, at the root
+    if (!heap || heap->size == 0)
+        return heap;
 
+    int size = heap->size;
+    struct process last_element = heap->p[size-1];
+    
+    // Update root value with the last element
+    heap->p[0] = last_element;
 
-	if ((*head) != NULL)
-		(*head)->prev = Q;
+    // Now remove the last element, by decreasing the size
+    heap->size--;
+    size--;
 
-	(*head) = Q;
+    // We need to call heapify(), to maintain the min-heap
+    // property
+    heap = heapify(heap,0);
+    return heap;
+}
+
+MinHeap* heapify(MinHeap* heap, int index) {
+    
+    if (heap->size <= 1)
+        return heap;
+    
+    int left = left_child(index); 
+    int right = right_child(index); 
+    int smallest = index; 
+    if (left < heap->size && heap->p[left].data < heap->p[index].data) 
+        smallest = left; 
+    if (right < heap->size && heap->p[right].data < heap->p[smallest].data) 
+        smallest = right; 
+    if (smallest != index) 
+    { 
+        struct process temp = heap->p[index];
+        heap->p[index] = heap->p[smallest];
+        heap->p[smallest] = temp;
+        heap = heapify(heap, smallest); 
+    }
+
+    return heap;
+}
+void print_heap(MinHeap* heap) {
+    
+    printf("Min Heap:\n");
+    for (int i=0; i<heap->size; i++) {
+        printf("%d -> ", heap->p[i].data);
+    }
+    printf("\n");
 }
 
 void pop(struct queue **head){
@@ -177,7 +249,7 @@ void FCFS(struct queue *q){
 		
 		if (pid>0){
 			while(finishedProcFlag==0){
-				sleep(0.5);
+				
 			}
 			time->_2= get_wtime();
 			printf("=====================================\n");
@@ -222,6 +294,7 @@ int main(int argc,char **argv)
 	struct process* PROCCS =NULL;
 	struct queue *Q =NULL;
 	FILE *fp;
+	
 	char * FILENAME;
 	int n;
 
@@ -229,16 +302,17 @@ int main(int argc,char **argv)
 	fp = fopen(FILENAME,"r");
 	n=numOfProcess(fp);
 	PROCCS=(struct process*)malloc(n*sizeof(struct process));
-	
+	MinHeap* heap = init_minheap(n);
 	getProcess(fp,n,PROCCS);
 	
-	for(int i=n-1;i>=0;i--) push(&Q,&PROCCS[i]);
+	for(int i=n-1;i>=0;i--) insert_minheap(heap,PROCCS[i]);
+	print_heap(heap);
 
-	time_1 = get_wtime();
-	FCFS(Q);
-	time_2 = get_wtime();
+	//time_1 = get_wtime();
+	//FCFS(Q);
+	//time_2 = get_wtime();
 
-	printf("\n For File = %s needed Time:%f\n",FILENAME,time_2-time_1);
+	//printf("\n For File = %s needed Time:%f\n",FILENAME,time_2-time_1);
 	//printf("%s \n",Q->next->next->p->name);
 
 
