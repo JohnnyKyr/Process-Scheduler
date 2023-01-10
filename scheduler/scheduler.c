@@ -22,6 +22,12 @@ struct process{
 	int data;
 };
 
+/*Struct Time is used for storing shared variable's data*/
+struct time {
+	double _1;
+	double _2;
+};
+
 
 void push(struct queue **head,struct process *PROCC){
 	struct queue* Q = (struct queue*)malloc(sizeof(struct queue));
@@ -37,6 +43,11 @@ void push(struct queue **head,struct process *PROCC){
 
 	(*head) = Q;
 }
+
+
+	//printf("%s",Q->p->name);
+	
+
 
 void ordered_push(struct queue **head,struct process *PROCC){
 	struct queue* Q = (struct queue*)malloc(sizeof(struct queue));
@@ -146,11 +157,6 @@ double get_wtime(void)
   return (double)t.tv_sec + (double)t.tv_usec*1.0e-6;
 }
 
-struct time {
-	double _1;
-	double _2;
-};
-
 
 
 void FCFS(struct queue *q){
@@ -190,7 +196,7 @@ void FCFS(struct queue *q){
 	}
 }
 
-
+void SJF(struct queue *q){}
 //pid = fork();
 //	if (pid == 0) { /* child */
 //		child();
@@ -232,7 +238,7 @@ int main(int argc,char **argv)
 	FCFS(Q);
 	time_2 = get_wtime();
 
-	printf("\n For File = %s needed Time:%d\n",FILENAME,time_2-time_1);
+	printf("\n For File = %s needed Time:%f\n",FILENAME,time_2-time_1);
 	//printf("%s \n",Q->next->next->p->name);
 
 
