@@ -240,11 +240,13 @@ void _static(struct queue *q){
 	key_t key;
 	
 	struct time *time;
-
+	struct sigaction sact;
 	key = ftok("../scheduler", 65);
-
+	sact.sa_handler = handler;
+	sigemptyset(&sact.sa_mask);
+	sact.sa_flags =0;
 	int shmid = shmget(key,sizeof(struct time),0666|IPC_CREAT);
-	signal(SIGCHLD, handler);
+	sigaction(SIGCLD,&sact,NULL);
 	time = shmat(shmid,NULL,0);
 
 	while(q!=NULL){
