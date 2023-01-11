@@ -6,6 +6,7 @@
 #include <sys/shm.h>
 #include <wait.h>
 #include <string.h>
+#include <time.h>
 /* header files */
 
 /* global definitions */
@@ -28,6 +29,7 @@ struct queue{
 };
 
 struct process{
+	int proc;
 	char * name;
 	int data;
 };
@@ -151,7 +153,7 @@ void printList(struct queue* node){
 	while (node != NULL) {
 		printf("%s %d\n", node->p->name,node->p->data);
 		
-		node = node->next;
+		node = node->prev;
 	}
 	
 	
@@ -212,7 +214,7 @@ void getProcess(FILE *fp,int n,struct process *PROCCS){
 		
 		PROCCS[i].data = n1;
 		PROCCS[i].name = buf;
-
+		PROCCS[i].proc = 0;
 		i++;
 	}
 
@@ -253,9 +255,7 @@ void _static(struct queue *q){
 		pid = fork();
 		
 		if (pid>0){
-			while(finishedProcFlag==0){
-				
-			}
+			while(finishedProcFlag==0){}
 			time->_2= get_wtime();
 			printf("=====================================\n");
 			printf("For process: %d\n",pid);
@@ -273,6 +273,60 @@ void _static(struct queue *q){
 	}
 }
 
+
+
+void rr(struct queue *q,int quantum){
+	int pid;
+	struct time *time;
+	struct sigaction sact;
+	key_t key;
+
+	sact.sa_handler = handler;
+	sigemptyset(&sact.sa_mask);
+	sact.sa_flags =0;
+	sigaction(SIGCLD,&sact,NULL);
+
+	key = ftok("../scheduler", 65);
+	int shmid = shmget(key,sizeof(struct time),0666|IPC_CREAT);
+	time = shmat(shmid,NULL,0);
+
+	printf("FIRST AND FOREMOST");
+	printList(q);
+	while(q!=NULL){
+		pid = fork();
+		
+		if (pid>0){
+			struct timespec  request;
+			request.tv_sec=quantum/1000;
+			int response = nanosleep(&request,NULL);
+			kill(pid,SIGSTOP);
+	
+			q->p->proc = pid; 
+			printList(q);
+			pop(&q);
+			printList(q);
+			push(&q,&q->p);
+			printList(q);
+			//change running process
+			time->_2= get_wtime();
+			
+			
+		}else if (pid ==0){
+			if (q->p->proc ==0){
+				fprintf(stderr,"EDQ\n\n\n\n");
+    		time->_1 = get_wtime();
+			execl(q->p->name,NULL);}
+			else{
+				kill(q->p->proc,SIGCONT);
+				time->_1 = get_wtime();
+				execl(q->p->name,NULL);
+
+			}
+			exit(1);
+		}
+	}
+
+}
 //pid = fork();
 //	if (pid == 0) { /* child */
 //		child();
@@ -307,12 +361,18 @@ int main(int argc,char **argv)
 	
 	char * FILENAME;
 	int n;
+	printf("FILE%s\n",argv[argc-1] );
+
+	
 	FILENAME = argv[argc-1];
 	fp = fopen(FILENAME,"r");
+	
 	n=numOfProcess(fp);
 	PROCCS=(struct process*)malloc(n*sizeof(struct process));
+	
 	getProcess(fp,n,PROCCS);
 
+	
 
 	if(strcmp(argv[1],"BATCH")==0){
 		
@@ -344,7 +404,19 @@ int main(int argc,char **argv)
 		time_2 = get_wtime();
 		printf("\n For File = %s and Method =%s needed Time:%f\n",FILENAME,argv[1],time_2-time_1);
 
+	}else if(strcmp(argv[1],"RR")==0){
+		
+		for(int i=0;i<n;i++) push(&Q,&PROCCS[i]);
+	
+		Q = gotoHead(Q,n);
+		time_1 = get_wtime();
+		rr(Q,argv[2]);
+		time_2 = get_wtime();
+		printf("\n For File = %s and Method =%s needed Time:%f\n",FILENAME,argv[1],time_2-time_1);
+		
+
 	}
+
 	
 }
 
