@@ -151,7 +151,7 @@ void printList(struct queue* node){
 	
 	printf("\nTraversal in forward direction \n");
 	while (node != NULL) {
-		printf("%s %d\n", node->p->name,node->p->data);
+		fprintf(stderr,"%s %d\n", node->p->name,node->p->data);
 		
 		node = node->prev;
 	}
@@ -221,6 +221,18 @@ void getProcess(FILE *fp,int n,struct process *PROCCS){
  
 }
 
+struct queue * gotoHead(struct queue* q,int n ){
+	for(int i=0;i<n-1;i++){
+		q = q->next;
+	}
+	return q;
+}
+struct queue * gotoTail(struct queue* q, int n ){
+	for(int i=0;i<n-1;i++){
+		q = q->prev;
+	}
+	return q;
+}
 void handler(int signo){
 	finishedProcFlag =1;
 	int pid, status;
@@ -273,14 +285,32 @@ void _static(struct queue *q){
 	}
 }
 
+struct queue *_ready(struct queue **q,int time_quantum){
+	struct queue *temp =NULL;
+	int size = 0;
+	//should find a mechanism to pop q 
+	while(q!=NULL){
+		if((*q)->p->data<=time_quantum){
+			push(&temp,(*q)->p);
+			size ++;
+			
+		}
+		
+		pop((*q));
+	}
+	
+	temp = gotoHead(temp,size);
+	
+	return temp;
+}
 
-
-void rr(struct queue *q,int quantum){
+void rr(struct queue *q,int quantum,int size){
 	int pid;
 	struct time *time;
 	struct sigaction sact;
 	key_t key;
-
+	struct queue *request;
+	int passed_quantum =1;
 	sact.sa_handler = handler;
 	sigemptyset(&sact.sa_mask);
 	sact.sa_flags =0;
@@ -290,41 +320,59 @@ void rr(struct queue *q,int quantum){
 	int shmid = shmget(key,sizeof(struct time),0666|IPC_CREAT);
 	time = shmat(shmid,NULL,0);
 
-	printf("FIRST AND FOREMOST");
-	printList(q);
 	while(q!=NULL){
 		pid = fork();
 		
 		if (pid>0){
 			struct timespec  request;
+			
 			request.tv_sec=quantum/1000;
+			fprintf(stderr,"LSTUCK HERE");
 			int response = nanosleep(&request,NULL);
-			kill(pid,SIGSTOP);
-	
-			q->p->proc = pid; 
-			printList(q);
-			pop(&q);
-			printList(q);
-			push(&q,&q->p);
-			printList(q);
-			//change running process
-			time->_2= get_wtime();
+			if(finishedProcFlag ==1){
+				pop(q);
+				size--;
+				time->_2= get_wtime();
+			}else{
+				
+				passed_quantum++;
+				kill(pid,SIGSTOP);
+		
+				
+				//printList(q);
+				
+				//pop(&q);
+				//size--;
+				//gotoTail(q,size);
+				//printList(q);
+				//push(&q,q->p);
+				//gotoHead(q,size);
+				//printList(q);
+				//change running process
+			
+			}
 			
 			
 		}else if (pid ==0){
-			if (q->p->proc ==0){
+			
+			request = _ready(q,passed_quantum);
+			
+			
+				if (request->p->proc ==0){
 				fprintf(stderr,"EDQ\n\n\n\n");
-    		time->_1 = get_wtime();
-			execl(q->p->name,NULL);}
-			else{
-				kill(q->p->proc,SIGCONT);
 				time->_1 = get_wtime();
-				execl(q->p->name,NULL);
+				execl(request->p->name,NULL);}
+				else{
+					kill(request->p->proc,SIGCONT);
+					time->_1 = get_wtime();
+					execl(request->p->name,NULL);
 
 			}
 			exit(1);
-		}
-	}
+
+			
+			
+		}}
 
 }
 //pid = fork();
@@ -345,12 +393,6 @@ void rr(struct queue *q,int quantum){
 /* signal handler(s) */
 
 /* implementation of the scheduling policies, etc. batch(), rr() etc. */
-struct queue * gotoHead(struct queue* q,int n ){
-	for(int i=0;i<n-1;i++){
-		q = q->next;
-	}
-	return q;
-}
 
 int main(int argc,char **argv)
 {
@@ -410,12 +452,13 @@ int main(int argc,char **argv)
 	
 		Q = gotoHead(Q,n);
 		time_1 = get_wtime();
-		rr(Q,argv[2]);
+		rr(Q,argv[2],n);
 		time_2 = get_wtime();
 		printf("\n For File = %s and Method =%s needed Time:%f\n",FILENAME,argv[1],time_2-time_1);
 		
 
 	}
+
 
 	
 }
