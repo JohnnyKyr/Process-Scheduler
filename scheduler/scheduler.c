@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <time.h>
+#include <sys/types.h>
 /* header files */
 
 /* global definitions */
@@ -39,7 +40,8 @@ struct queue{
 
 struct process{
 	int pid;
-	int proc;
+	double time1;
+	double time2;
 	char * name;
 	int data;
 };
@@ -148,7 +150,7 @@ void print_heap(MinHeap* heap) {
     for (int i=0; i<heap->size; i++) {
         printf("%d -> ", heap->p[i].data);
     }
-    printf("\n");
+	printf("\n");
 }
 
 void pop(struct queue **head)
@@ -235,7 +237,7 @@ void getProcess(FILE *fp,int n,struct process *PROCCS){
 		
 		PROCCS[i].data = n1;
 		PROCCS[i].name = buf;
-		PROCCS[i].proc = 0;
+		PROCCS[i].pid = 0;
 		i++;
 	}
 
@@ -256,13 +258,19 @@ struct queue * gotoTail(struct queue* q, int n ){
 	}
 	return q;
 }
-void handler(int signo){
-	printf("I entered, without my programmers permision\n");
-	finishedProcFlag =1;
+void sigchld_handler(int signo){
 	int pid, status;
+	
+	
 
-	while ((pid = waitpid(-1, &status, WNOHANG)) > 0);
+	while ((pid = waitpid(-1, &status, WNOHANG)) > 0){
+		finishedProcFlag=1;
+	}
+	
+
+	
 }
+
 double get_wtime(void)
 {
   struct timeval t;
@@ -272,7 +280,7 @@ double get_wtime(void)
 
 
 
-void _static(struct queue *q){
+void _static(struct queue *q,int flag){
 	int pid;
 	
 	key_t key;
@@ -280,25 +288,26 @@ void _static(struct queue *q){
 	struct time *time;
 	struct sigaction sact;
 	key = ftok("../scheduler", 65);
-	sact.sa_handler = handler;
+	sact.sa_handler = sigchld_handler;
 	sigemptyset(&sact.sa_mask);
 	sact.sa_flags =0;
 	int shmid = shmget(key,sizeof(struct time),0666|IPC_CREAT);
 	sigaction(SIGCHLD,&sact,NULL);
 	time = shmat(shmid,NULL,0);
-
+	double time1 =get_wtime();
 	while(q!=NULL){
 		pid = fork();
 		
 		if (pid>0){
 			while(finishedProcFlag==0){}
+			double time2 = time->_2;
 			time->_2= get_wtime();
-			printf("=====================================\n");
-			printf("For process: %d\n",pid);
-			printf("\t Executes:%s\n",q->p->name);
-			printf("\t Has Execution Time:%d\n",q->p->data);
-			printf("\t Elapsed Time:%f\n",time->_2-time->_1);
-			printf("=====================================\n");
+			time2 = time->_2-time2;
+			printf("PID %d - CMD: %s\n",pid,q->p->name);
+			printf("\t\t\t\t Elapsed time = %f\n",time->_2-time->_1);
+			if(flag==1)
+			printf("\t\t\t\t Workload time = %f\n",  time->_2-time1);
+				
 			finishedProcFlag=0;
 			pop(&q);
 		}else if (pid ==0){
@@ -307,10 +316,11 @@ void _static(struct queue *q){
 			exit(1);
 		}
 	}
+	if (flag==1)
+	printf("WORKLOAD TIME: %f seconds\n",time->_2-time1);
 }
 struct queue * pushHeadtoTail(struct queue *requestQ,int n){
-	//fprintf(stderr,"I am in pop");
-	//printList(requestQ);
+	
 		if (n<=1) return requestQ;
 		struct process *procc = requestQ->p;
 		pop(&requestQ);
@@ -321,25 +331,21 @@ struct queue * pushHeadtoTail(struct queue *requestQ,int n){
 		return requestQ;
 }
 
-void rr(struct queue *q,int quantum,int size){
-	
-	sigset_t mask;
+void rr(struct queue *q,float quantum,int size,int flag){
+	struct time *time;
     struct sigaction sa;
-	sa.sa_handler = handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_RESTART;
-	sigaction(SIGCHLD, &sa, NULL);
-
-    // Block the SIGCHLD signal
+    sa.sa_handler = sigchld_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGCHLD, &sa, NULL);
+	sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGCHLD);
-   
-
+    sigprocmask(SIG_BLOCK, &mask, NULL);
 	
 	struct queue *requestQ=NULL;
 	int n =0;
 	message message;
-	
 	int fd = shm_open("/my_shared_struct", O_CREAT | O_RDWR, 0666);
 
     // Set the size of the shared memory region
@@ -351,18 +357,22 @@ void rr(struct queue *q,int quantum,int size){
 
 	int pid; // process id
 	
-	struct time *time; // init time vars
 	
-	struct timespec  request;
-	request.tv_sec=quantum/1000;
-	int passed_quantum =1;
+	// Set the size of the shared memory region
+    ftruncate(fd, sizeof(struct time*));
+
+    // Map the shared memory region to a pointer
+    time = mmap(NULL, sizeof(struct time*), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
 
+	float t_quantum = quantum/1000;
+	struct timespec rqtp,rmtp = {0,quantum};
+	
+	time->_1=get_wtime();
 	while(1){
-		printf("================================\n");
 		
-		
-			while( q!=NULL && q->p->data<=passed_quantum ) {
+			
+			while( q!=NULL  ) {
 				
 				requestQ= gotoTail(requestQ,n);
 				push(&requestQ,q->p);
@@ -377,84 +387,96 @@ void rr(struct queue *q,int quantum,int size){
 					
 					
 					if(pid>0){
-						sigprocmask(SIG_BLOCK, &mask, NULL);
+						 
 						requestQ->p->pid = pid;
+						requestQ->p->time2 =0;
+						requestQ->p->time1 = get_wtime();
+						requestQ->p->time2 =get_wtime();
 						sleep(1);
-						//fprintf(stderr,"Has with name=%s, for process=%d\n",requestQ->p->name,requestQ->p->pid);
-
 						kill(requestQ->p->pid,SIGSTOP);
-						sigprocmask(SIG_UNBLOCK, &mask, NULL);
-						//fprintf(stderr,"Stopeed with name=%s, for process=%d\n",requestQ->p->name,requestQ->p->pid);
+						
 						requestQ = pushHeadtoTail(requestQ,n);
 						
 					}
 					if(pid==0){
 						
-						//fprintf(stderr,"FirstFork with name=%s, for process=%d\n",requestQ->p->name,getpid());
-						
 						execl(requestQ->p->name,NULL);
 						exit(1);
 					}
-					passed_quantum++;
-				}		
-		
-				else{
-					if(requestQ==NULL) break;
-
-					printf("Now running the process:%s with id: %d\n",requestQ->p->name,requestQ->p->pid);
 					
+				}		
+				else if(requestQ!=NULL && requestQ->p->pid!=0){
+					double time1,time2;
 					sigprocmask(SIG_BLOCK, &mask, NULL);
+
+					time1 =get_wtime();
 					kill(requestQ->p->pid,SIGCONT);
 					sleep(1);
+					kill(requestQ->p->pid,SIGSTOP);
 					sigprocmask(SIG_UNBLOCK, &mask, NULL);
 					
+					time2 = get_wtime();
 					
-					
-					
-					
-
-					if(finishedProcFlag==1){
-
-						fprintf(stderr,"Completed:%s with pid:%d\n",requestQ->p->name,requestQ->p->pid);
+					double ntime = time2-time1;
+					requestQ->p->time2 += ntime;
+					if(finishedProcFlag==1&&requestQ!=NULL){
+						printf("PID %d - CMD: %s\n",requestQ->p->pid,requestQ->p->name);
+						printf("\t\t\t\t Elapsed time = %f\n",requestQ->p->time2-requestQ->p->time1);
+						time->_2 = get_wtime() ;
+						if(flag==1)
+						printf("\t\t\t\t Workload time = %f\n",  time->_2-time->_1);
 						pop(&requestQ);
 						n--;
 						finishedProcFlag=0;
-					}
-					else{
+				}else{
 						
-					sigprocmask(SIG_BLOCK, &mask, NULL);
-					kill(requestQ->p->pid,SIGSTOP);
-					sigprocmask(SIG_UNBLOCK, &mask, NULL);
 					requestQ =pushHeadtoTail(requestQ,n);
-					
+					}
 					}
 					
-				}
+			if (n==0)break;	
+				
 	
 	}
+	
 	munmap(requestQ, sizeof(struct queue *));
-	passed_quantum++;printf("Quantum %d Flag=%d\n",passed_quantum,finishedProcFlag);
+	if (flag==1)
+	printf("WORKLOAD TIME: %f seconds\n",time->_2-time->_1);
 
 }
-//pi//d = fork();
-//	//if (pid == 0) { /* child */
-//	//	child();
-//	}
-//	printf("parent (%d) waits for child (%d)\n", getpid(), pid);
-//	waitpid(pid, &status, 0);
-//	if (WIFEXITED(status))
-//		printf("child exited normally with value %d\n", WEXITSTATUS(status));
-//	else
-//		printf("child was terminated abnormally\n");
-//	return 0;
-//}
-//
-/* global variables and data structures */
 
-/* signal handler(s) */
+void prio(struct queue *q,int quantum,int size){
+	int priority=q->p->data;
+	int n=0;
+	
+	double time1 = get_wtime();
+	while(1){
+		struct queue *priorityqueue=NULL;
+		while( q!=NULL && q->p->data<=priority ) {
+				
+				priorityqueue= gotoTail(priorityqueue,n);
+				push(&priorityqueue,q->p);
+				n++;
+				priorityqueue= gotoHead(priorityqueue,n);
+				pop(&q);
+				}
+				
+		if(n==1){		
+			_static(priorityqueue,0);
+			n=0;
 
-/* implementation of the scheduling policies, etc. batch(), rr() etc. */
+		}
+		else if (n>1){
+			rr(priorityqueue,quantum,n,0);
+			n=0;
+		}
+		priority++;
+		if(q==NULL&&priorityqueue==NULL) break;
+	}
+	printf("WORKLOAD TIME: %f seconds\n",get_wtime()-time1);
 
+	
+}
 int main(int argc,char **argv)
 {
 	double time_1, time_2;
@@ -465,7 +487,10 @@ int main(int argc,char **argv)
 	
 	char * FILENAME;
 	int n;
-	printf("FILE%s\n",argv[argc-1] );
+	float quantum;
+	sscanf(argv[2], "%f", &quantum);
+		
+	
 
 	
 	FILENAME = argv[argc-1];
@@ -477,7 +502,7 @@ int main(int argc,char **argv)
 	getProcess(fp,n,PROCCS);
 
 	
-
+	printf("#scheduler %s %s\n",argv[1],argv[argc-1]);
 	if(strcmp(argv[1],"BATCH")==0){
 		
 		
@@ -485,10 +510,9 @@ int main(int argc,char **argv)
 		
 		Q = gotoHead(Q,n);
 		time_1 = get_wtime();
-		_static(Q);
+		_static(Q,1);
 		time_2 = get_wtime();
-		printf("\n For File = %s and Method =%s needed Time:%f\n",FILENAME,argv[1],time_2-time_1);
-		
+ 		
 	}
 	else if(strcmp(argv[1],"SJF")==0){
 		MinHeap* heap = init_minheap(n);
@@ -504,20 +528,37 @@ int main(int argc,char **argv)
 		
 		Q = gotoHead(Q,n);
 		time_1 = get_wtime();
-		_static(Q);
+		_static(Q,1);
 		time_2 = get_wtime();
-		printf("\n For File = %s and Method =%s needed Time:%f\n",FILENAME,argv[1],time_2-time_1);
-
+ 
 	}else if(strcmp(argv[1],"RR")==0){
 		
 		for(int i=0;i<n;i++) push(&Q,&PROCCS[i]);
-	
+		
 		Q = gotoHead(Q,n);
 		time_1 = get_wtime();
-		rr(Q,argv[2],n);
+		rr(Q,quantum,n,1);
 		time_2 = get_wtime();
-		printf("\n For File = %s and Method =%s needed Time:%f\n",FILENAME,argv[1],time_2-time_1);
+ 		
+
+	}else if(strcmp(argv[1],"PRIO")==0){
+		MinHeap* heap = init_minheap(n);
+		for(int i=0;i<n;i++) insert_minheap(heap,PROCCS[i]);
+	
+		for(int i=0;i<n;i++){
+		struct process *temp = malloc(sizeof(struct process));
+		(*temp) = heap->p[0];
+		push(&Q,temp);
+		heap = delete_minimum(heap);
 		
+		}
+		
+		Q = gotoHead(Q,n);
+		
+		time_1 = get_wtime();
+		prio(Q,quantum,n);
+		time_2 = get_wtime();
+ 		
 
 	}
 
