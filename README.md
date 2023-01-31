@@ -2,9 +2,10 @@
 
 Implementation of Process Scheduler using, FCFS, SJF, Round Robin and Prio in C. Software Systems University Project 2022-2023. 
 The project used the functions below:
-execl: for execting files.
-signals: SIGCHLD (for capturing the finished process), SIGSTOP AND SIGCONT (for stoping and starting a process).
-nanosleep: The quantum of the RR and PRIO
+
+* execl: for execting files.
+* signals: SIGCHLD (for capturing the finished process), SIGSTOP AND SIGCONT (for stoping and starting a process).
+* nanosleep: The quantum of the RR and PRIO
 
 # How to run:
 ./scheduler [method] [quantum(optional)] [file name]
