@@ -8,7 +8,8 @@ nanosleep: The quantum of the RR and PRIO
 
 # How to run:
 ./scheduler [method] [quantum(optional)] [file name]
-#Usage:
+
+# Usage:
 1. Go to work file and make the Makefile. Produces 7 executable files from work.c, with different running times.
 2. Then go to scheduler file and compile scheduler.c gcc scheduler.c -o scheduler.
 3. Test the program with ./run.sh for some possible cases.
